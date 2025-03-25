@@ -10,62 +10,67 @@ export default function Login() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
     setLoading(true);
+    setError(null);
 
     try {
+      // Sign in with Supabase
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
-      if (error) throw error;
+      if (error) {
+        throw error;
+      }
 
-      // Try to ensure user exists in our database
+      // Check if the user exists in our database
       try {
-        const userResponse = await fetch('/api/users', {
+        const response = await fetch('/api/users', {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
+            'Authorization': `Bearer ${data.session.access_token}`,
           },
         });
-        
-        // If user doesn't exist in our database, try to create them
-        if (!userResponse.ok && userResponse.status === 404) {
-          console.warn('User exists in Supabase Auth but not in our database. Attempting to create...');
-          
+
+        // If user is not found in database (404), create a new record
+        if (response.status === 404) {
           try {
-            await fetch('/api/users', {
+            const createResponse = await fetch('/api/users', {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
+                'Authorization': `Bearer ${data.session.access_token}`,
               },
               body: JSON.stringify({
                 id: data.user.id,
                 email: data.user.email,
-                name: data.user.user_metadata?.name || email.split('@')[0],
+                name: data.user.user_metadata?.name || data.user.email?.split('@')[0],
               }),
             });
-          } catch (createErr) {
-            console.error('Failed to create user record on login:', createErr);
-            // Continue despite error - user is still authenticated
+
+            if (!createResponse.ok && createResponse.status !== 207) {
+              console.warn('Failed to create user record, but login succeeded');
+            }
+          } catch (err) {
+            console.warn('Error creating user record on login:', err);
           }
         }
-      } catch (dbErr) {
-        console.error('Error checking user in database:', dbErr);
-        // Continue despite database error - user is still authenticated
+      } catch (err) {
+        console.warn('Error checking/creating user on login:', err);
+        // Continue even if we can't check or create the user
       }
 
-      // Redirect to dashboard after successful login regardless of database status
+      // Redirect to dashboard
       router.push('/dashboard');
-      router.refresh();
     } catch (err) {
-      console.error('Error signing in:', err);
+      console.error('Error logging in:', err);
       setError(err instanceof Error ? err.message : 'An error occurred during login');
     } finally {
       setLoading(false);
@@ -78,20 +83,23 @@ export default function Login() {
       return;
     }
 
-    setError(null);
     setLoading(true);
+    setError(null);
 
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/auth/reset-password`,
       });
 
-      if (error) throw error;
-      
-      alert('Password reset email sent! Check your inbox.');
+      if (error) {
+        throw error;
+      }
+
+      // Show success message but don't redirect
+      alert('Password reset email sent. Please check your inbox.');
     } catch (err) {
       console.error('Error resetting password:', err);
-      setError(err instanceof Error ? err.message : 'An error occurred while sending reset email');
+      setError(err instanceof Error ? err.message : 'Failed to send password reset email');
     } finally {
       setLoading(false);
     }
@@ -101,23 +109,30 @@ export default function Login() {
     <div className="flex min-h-screen flex-col items-center justify-center py-12 px-4 sm:px-6 lg:px-8 bg-gray-50">
       <div className="w-full max-w-md">
         <div className="text-center">
-          <h2 className="mt-6 text-3xl font-bold text-gray-900">Sign in to your account</h2>
-          <p className="mt-2 text-sm text-gray-600">
-            Or{' '}
-            <Link href="/auth/signup" className="font-medium text-blue-600 hover:text-blue-500">
-              create a new account
-            </Link>
+          <h2 className="text-3xl font-bold text-gray-900">Sign in to your account</h2>
+          <p className="mt-2 text-gray-600">
+            Welcome back to StudyNotes
           </p>
         </div>
-        
+
         <div className="mt-8 bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
-          {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4">
-              {error}
-            </div>
-          )}
-          
           <form className="space-y-6" onSubmit={handleLogin}>
+            {error && (
+              <div className="bg-red-50 border-l-4 border-red-500 p-4">
+                <div className="flex">
+                  <div className="flex-shrink-0">
+                    <svg className="h-5 w-5 text-red-500" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm-1-9v4h2V9H9z" clipRule="evenodd" />
+                      <path fillRule="evenodd" d="M10 2a8 8 0 100 16 8 8 0 000-16zm0 14a6 6 0 100-12 6 6 0 000 12z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <div className="ml-3">
+                    <p className="text-sm text-red-700">{error}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700">
                 Email address
@@ -158,8 +173,8 @@ export default function Login() {
               <div className="text-sm">
                 <button
                   type="button"
-                  className="font-medium text-blue-600 hover:text-blue-500"
                   onClick={handleResetPassword}
+                  className="font-medium text-blue-600 hover:text-blue-500"
                 >
                   Forgot your password?
                 </button>
@@ -170,14 +185,14 @@ export default function Login() {
               <Button
                 type="submit"
                 variant="primary"
-                className="w-full flex justify-center py-2 px-4"
+                className="w-full"
                 disabled={loading}
               >
                 {loading ? 'Signing in...' : 'Sign in'}
               </Button>
             </div>
           </form>
-          
+
           <div className="mt-6">
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
@@ -189,9 +204,10 @@ export default function Login() {
             </div>
 
             <div className="mt-6">
-              <button
+              <Button
                 type="button"
-                className="w-full flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
+                variant="outline"
+                className="w-full"
                 onClick={async () => {
                   try {
                     const { error } = await supabase.auth.signInWithOAuth({
@@ -203,13 +219,28 @@ export default function Login() {
                     if (error) throw error;
                   } catch (err) {
                     console.error('Error signing in with Google:', err);
-                    setError('Failed to sign in with Google');
+                    setError(err instanceof Error ? err.message : 'An error occurred during sign in');
                   }
                 }}
               >
-                <span>Google</span>
-              </button>
+                <svg className="h-5 w-5 mr-2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
+                  <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
+                  <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
+                  <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
+                </svg>
+                Sign in with Google
+              </Button>
             </div>
+          </div>
+
+          <div className="mt-6 text-center">
+            <p className="text-sm text-gray-600">
+              Don't have an account?{' '}
+              <Link href="/auth/signup" className="font-medium text-blue-600 hover:text-blue-500">
+                Sign up
+              </Link>
+            </p>
           </div>
         </div>
       </div>

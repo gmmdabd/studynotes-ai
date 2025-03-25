@@ -26,6 +26,7 @@ model User {
   subscription  Subscription?
   notes         Note[]
   practicePapers PracticePaper[]
+  textSummaries TextSummary[]
 }
 
 model Subscription {
@@ -33,9 +34,13 @@ model Subscription {
   userId          String   @unique
   user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   planType        String   @default("FREE") // FREE, PREMIUM, PRO
+  plan            String   @default("FREE") // For compatibility with new code
   isActive        Boolean  @default(true)
   startDate       DateTime @default(now())
   endDate         DateTime?
+  quotaLimit      Int      @default(10)
+  quotaUsed       Int      @default(0)
+  validUntil      DateTime @default(dbgenerated("now() + interval '30 days'"))
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 }
@@ -88,4 +93,17 @@ model PracticePaper {
   user      User     @relation(fields: [userId], references: [id])
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model TextSummary {
+  id                String   @id @default(cuid())
+  originalTextLength Int
+  summaryLength     Int
+  style             String
+  length            String
+  storagePath       String?
+  userId            String
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 }

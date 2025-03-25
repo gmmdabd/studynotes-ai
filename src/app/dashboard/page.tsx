@@ -112,6 +112,7 @@ export default function Dashboard() {
             <Link href="/dashboard" className="text-blue-600 font-medium">Dashboard</Link>
             <Link href="/dashboard/notes" className="text-gray-500 hover:text-gray-700">Notes</Link>
             <Link href="/dashboard/practice" className="text-gray-500 hover:text-gray-700">Practice Papers</Link>
+            <Link href="/dashboard/summarize" className="text-gray-500 hover:text-gray-700">Text Summarizer</Link>
             <Link href="/dashboard/account" className="text-gray-500 hover:text-gray-700">Account</Link>
           </div>
         </div>
@@ -161,6 +162,15 @@ export default function Dashboard() {
                   </p>
                   <Link href="/dashboard/practice/create">
                     <Button variant="secondary" size="sm">Create Practice Paper</Button>
+                  </Link>
+                </div>
+                <div>
+                  <h3 className="text-md font-medium text-gray-700">Summarize Text</h3>
+                  <p className="text-sm text-gray-500 mb-2">
+                    Generate concise summaries of any text with AI assistance.
+                  </p>
+                  <Link href="/dashboard/summarize">
+                    <Button variant="outline" size="sm">Summarize Text</Button>
                   </Link>
                 </div>
               </div>
